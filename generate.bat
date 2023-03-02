@@ -1,0 +1,2 @@
+call npm run --prefix "NodeJS/Server" build && python3 "Scripts/generateSwagger.py" && python3 "Scripts/generateTypes.py" && python3 "Scripts/generateAssets.py" && python3 "Scripts/generateProperties.py"
+pause
