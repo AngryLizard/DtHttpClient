@@ -83,7 +83,7 @@ TWebPromisePtr<void> UDTSessionSubsystem::StartSession(const TArray<FDTEntityRef
 			OnSessionStart.Broadcast(Response.Body, EntityRefs);
 			OnSessionStart_Blueprint.Broadcast(Response.Body, EntityRefs);
 			return TWebPromise<void>::Accepted();
-		})
+		});
 		/* TODO: Implement server side events properly :)
 		->WeakThen(this, [this]()
 		{
