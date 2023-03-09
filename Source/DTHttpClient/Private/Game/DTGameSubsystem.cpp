@@ -105,7 +105,7 @@ void UDTGameSubsystem::OnGameObjectUpdate(const FDTEntityRef& EntityRef, UDTGame
 	FDTFactoryAsset FactoryAsset;
 	if (!TypeSubsystem->GetTypeAsset(GameObject->TypeReg, FactoryAsset))
 	{
-		UE_LOG(DTHttpClient, Error, TEXT("Asset for Type %s not found for entity %s. Maybe types weren't fetched yet?"), *GameObject->TypeReg, *GameObject->Name);
+		// No asset defined for this type
 		return;
 	}
 
@@ -115,7 +115,7 @@ void UDTGameSubsystem::OnGameObjectUpdate(const FDTEntityRef& EntityRef, UDTGame
 	UDTGameFactoryAsset** FactoryAssetPtr = AssetSubsystem->FactoryAssets.Find(FactoryAsset);
 	if (!FactoryAssetPtr)
 	{
-		UE_LOG(DTHttpClient, Warning, TEXT("No factory found for asset %s"), *LexToString(FactoryAsset));
+		UE_LOG(DTHttpClient, Warning, TEXT("No game object factory found for asset %s"), *LexToString(FactoryAsset));
 		return;
 	}
 
@@ -126,7 +126,7 @@ void UDTGameSubsystem::OnGameObjectUpdate(const FDTEntityRef& EntityRef, UDTGame
 		GameComponent = (*FactoryAssetPtr)->Build(GetWorld(), EntityRef, GameObject);
 		if (!GameComponent.IsValid())
 		{
-			UE_LOG(DTHttpClient, Warning, TEXT("aborted build for %s"), *LexToString(EntityRef));
+			UE_LOG(DTHttpClient, Warning, TEXT("Aborted game object build for %s"), *LexToString(EntityRef));
 			return;
 		}
 	}

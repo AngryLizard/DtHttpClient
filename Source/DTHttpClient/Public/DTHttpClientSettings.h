@@ -79,10 +79,28 @@ public:
 		int32 ServerPort = 3000;
 
 	/**
-	* Time in seconds between server updates.
+	* Whether to get updates via server side events (opposed to polling).
 	*/
 	UPROPERTY(config, EditAnywhere)
-		float UpdateFrequency = 2.0f;
+		bool bSSEEnabled = true;
+
+	/**
+	* Maximum number of bytes before the SSE connection is updated
+	*/
+	UPROPERTY(config, EditAnywhere)
+		int32 SSEBufferSize = 0xFFFF;
+
+	/**
+	* SSE timeout before we force re-establish the SSE connection
+	*/
+	UPROPERTY(config, EditAnywhere)
+		float SSETimeout = 1800.f;
+
+	/**
+	* Time in seconds between server polls if SSE is currently down or disabled.
+	*/
+	UPROPERTY(config, EditAnywhere)
+		float UpdatePollFrequency = 2.0f;
 
 	/**
 	* Maximum delay in seconds we expect

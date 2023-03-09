@@ -37,12 +37,10 @@ void UDTSessionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 void UDTSessionSubsystem::Deinitialize()
 {
-	if (ActiveSSEContext.IsSet())
+	ActiveSession.Reset();
+	if (ActiveSSEContext.IsValid())
 	{
-		if (ActiveSSEContext.GetValue())
-		{
-			ActiveSSEContext->Get()->Stop();
-		}
+		ActiveSSEContext->Stop();
 		ActiveSSEContext.Reset();
 	}
 
@@ -78,27 +76,14 @@ TWebPromisePtr<void> UDTSessionSubsystem::StartSession(const TArray<FDTEntityRef
 			
 			ActiveSession = Response.Body;
 			ObservedEntities = EntityRefs;
+
+			const UDTHttpClientSettings* Settings = GetDefault<UDTHttpClientSettings>();
 			RestartUpdateTimer();
 
 			OnSessionStart.Broadcast(Response.Body, EntityRefs);
 			OnSessionStart_Blueprint.Broadcast(Response.Body, EntityRefs);
 			return TWebPromise<void>::Accepted();
 		});
-		/* TODO: Implement server side events properly :)
-		->WeakThen(this, [this]()
-		{
-			UDTHttpClientSubsystem* ClientSubsystem = UDTHttpClientSubsystem::Get(GetGameInstance());
-			check(ClientSubsystem);
-
-			ActiveSSEContext = UDTHttpRequester::StartSSESession(ClientSubsystem->GetContext(), TEXT("/session/events") / SanitizeArg(ActiveSession.GetValue()),
-				UDTHttpRequester::FSSEResultCallback<TArray<FDTPropertyChange>>::CreateWeakLambda(this, [this](const TArray<FDTPropertyChange>& Result)
-				{
-					UE_LOG(DTHttpClient, Log, TEXT("Got changes from SSE> %d"), Result.Num());
-				}));
-
-			return TWebPromise<void>::Accepted();
-		});
-		*/
 }
 
 TWebPromisePtr<void> UDTSessionSubsystem::StopSession()
@@ -131,12 +116,9 @@ TWebPromisePtr<void> UDTSessionSubsystem::StopSession()
 			StopUpdateTimer();
 			ActiveSession.Reset();
 			ObservedEntities.Reset();
-			if (ActiveSSEContext.IsSet())
+			if (ActiveSSEContext.IsValid())
 			{
-				if (ActiveSSEContext.GetValue())
-				{
-					ActiveSSEContext->Get()->Stop();
-				}
+				ActiveSSEContext->Stop();
 				ActiveSSEContext.Reset();
 			}
 			return TWebPromise<void>::Accepted();
@@ -195,11 +177,48 @@ void UDTSessionSubsystem::OnTimerUpdate(bool Refresh)
 				->WeakThen(this, [this](const FDateTime& Time)
 				{
 					LastUpdateTime = Time;
-					const UDTHttpClientSettings* Settings = GetDefault<UDTHttpClientSettings>();
 
-					GetWorld()->GetTimerManager().SetTimer(UpdateTimerHandle, FTimerDelegate::CreateUObject(this, &UDTSessionSubsystem::OnTimerUpdate, false), Settings->UpdateFrequency, false);
+					const UDTHttpClientSettings* Settings = GetDefault<UDTHttpClientSettings>();
+					if (Settings->bSSEEnabled)
+					{
+						UDTHttpClientSubsystem* ClientSubsystem = UDTHttpClientSubsystem::Get(GetGameInstance());
+						check(ClientSubsystem);
+
+						ActiveSSEContext = UDTHttpRequester::StartSSESession(ClientSubsystem->GetContext(), 
+							TEXT("/session/events") / SanitizeArg(ActiveSession.GetValue()), Settings->SSEBufferSize, Settings->SSETimeout,
+							UDTHttpRequester::FSSEResultCallback<FDTSessionUpdate>::CreateUObject(this, &UDTSessionSubsystem::OnSSEUpdate));
+
+						if (ActiveSSEContext.IsValid())
+						{
+							ActiveSSEContext->OnStop.AddUObject(this, &UDTSessionSubsystem::OnSSEStop);
+							return;
+						}
+					}
+
+					// If SSE failed or isn't enabled just queue next update
+					GetWorld()->GetTimerManager().SetTimer(UpdateTimerHandle, FTimerDelegate::CreateUObject(this, &UDTSessionSubsystem::OnTimerUpdate, false), Settings->UpdatePollFrequency, false);
 				});
 		}));
+}
+
+void UDTSessionSubsystem::OnSSEUpdate(const FDTSessionUpdate& Result)
+{
+	UE_LOG(DTHttpClient, Verbose, TEXT("Received SSE update with %d changes"), Result.Changes.Num());
+
+	LastUpdateTime = Result.Timestamp;
+	PushChanges(Result.Changes, true);
+}
+
+void UDTSessionSubsystem::OnSSEStop()
+{
+	ActiveSSEContext.Reset();
+
+	// Queue next update if there is still an active session
+	if (ActiveSession.IsSet())
+	{
+		const UDTHttpClientSettings* Settings = GetDefault<UDTHttpClientSettings>();
+		GetWorld()->GetTimerManager().SetTimer(UpdateTimerHandle, FTimerDelegate::CreateUObject(this, &UDTSessionSubsystem::OnTimerUpdate, false), Settings->UpdatePollFrequency, true);
+	}
 }
 
 TWebPromisePtr<FDateTime> UDTSessionSubsystem::UpdateSession(const FDateTime& Time, bool Refresh)
@@ -213,7 +232,7 @@ TWebPromisePtr<FDateTime> UDTSessionSubsystem::UpdateSession(const FDateTime& Ti
 	check(ClientSubsystem);
 
 	const EDTPropertyQuery Query = Refresh ? EDTPropertyQuery::Refresh : EDTPropertyQuery::Diff;
-	return UDTApi::PostSessionUpdateWith(ClientSubsystem->GetContext(), ActiveSession.GetValue(), Time, Query, FEmptyBody())
+	return UDTApi::PostSessionResetWith(ClientSubsystem->GetContext(), ActiveSession.GetValue(), Time, Query, FEmptyBody())
 		->WeakThen(this, [this](const FResponseData<FDTSessionUpdate>& Response)
 		{
 			if (!Response.IsOk())
@@ -228,8 +247,7 @@ TWebPromisePtr<FDateTime> UDTSessionSubsystem::UpdateSession(const FDateTime& Ti
 				return TWebPromise<FDateTime>::Rejected(FWebError());
 			}
 
-			UE_LOG(DTHttpClient, Log, TEXT("Received session update with %d changes"), Response.Body.Changes.Num());
-
+			UE_LOG(DTHttpClient, Verbose, TEXT("Received session update with %d changes"), Response.Body.Changes.Num());
 			PushChanges(Response.Body.Changes, true);
 			return TWebPromise<FDateTime>::Accepted(Response.Body.Timestamp);
 		});

@@ -130,112 +130,6 @@ public:
 };
 
 UCLASS(BlueprintType)
-class DTHTTPCLIENT_API UDTGameWorldObject : public UDTGameEntityObject
-{
-	GENERATED_BODY()
-public:
-
-    FDTGenericTimeline<float> TemperatureProperty = "";
-    UFUNCTION(BlueprintPure, Category = "DTHttp")
-        void GetTemperature(const FDateTime& Timestamp, float& Previous, float& Value, float& Alpha) const
-        {
-            const FDTGenericKeyframe<float>& keyframe = TemperatureProperty.Peek(Timestamp);
-            Alpha = LerpTimestamp(Timestamp, keyframe.Timestamp, keyframe.Duration);
-            Previous = keyframe.Previous;
-            Value = keyframe.Value;
-        }
-
-    
-    FDTGenericPropertyValue<FDTLevelAsset> LevelProperty = "";
-    UFUNCTION(BlueprintPure, Category = "DTHttp")
-        const FDTLevelAsset& GetLevel() const
-        {
-            return LevelProperty.Value;
-        }
-
-	virtual bool PushChange(const FDTPropertyChange& Change) override
-	{
-		if (Change.PropReg.Equals(TEXT("temperature"))) { TemperatureProperty.Push(Change); return true; }
-		return Super::PushChange(Change);
-	}
-	virtual bool PushAttributes(const FDTAttributeData& data) override
-	{
-		if (data.PropReg.Equals(TEXT("level"))) { LexFromString(LevelProperty.Value, *data.PropVal); return true; }
-		return Super::PushAttributes(data);
-	}
-	virtual EDTType GetType() const override
-    {
-        return EDTType::World;
-    }
-};
-
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnGameWorldTick, UDTGameWorldObject*, GameObject, const FDateTime&, Timestamp);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnGameWorldUpdate, UDTGameWorldObject*, GameObject);
-
-UCLASS(ClassGroup = (GameObjects), Blueprintable, meta = (BlueprintSpawnableComponent))
-class DTHTTPCLIENT_API UDTGameWorldComponent : public UDTGameBaseComponent
-{
-	GENERATED_BODY()
-public:
-
-	UPROPERTY(BlueprintReadOnly, Category = "DTHttp")
-		TWeakObjectPtr<UDTGameWorldObject> GameObject;
-        
-	UPROPERTY(BlueprintAssignable)
-        FOnGameWorldTick OnGameTick;
-        
-	UPROPERTY(BlueprintAssignable)
-        FOnGameWorldUpdate OnGameUpdate;
-    
-	virtual bool TryAssignObject(UDTGameBaseObject* InGameObject) override
-	{
-		GameObject = Cast<UDTGameWorldObject>(InGameObject);
-		return GameObject.IsValid();
-	}
-
-	virtual void GameTick(const FDateTime& Timestamp) override
-	{
-        Super::GameTick(Timestamp);
-        if (GameObject.IsValid())
-        {
-            OnGameTick.Broadcast(GameObject.Get(), Timestamp);
-        }
-	}
-
-	virtual void GameUpdate() override
-	{
-        Super::GameUpdate();
-        if (GameObject.IsValid())
-        {
-            OnGameUpdate.Broadcast(GameObject.Get());
-        }
-	}
-};
-
-UCLASS(ClassGroup = (GameObjects), Blueprintable, meta = (BlueprintSpawnableComponent))
-class DTHTTPCLIENT_API ADTSetupWorldActor : public ADTSetupEntityActor
-{
-	GENERATED_BODY()
-public:
-
-	UFUNCTION(BlueprintImplementableEvent, Category = "DTHttp")
-    void GetWorldSetupValues(ADTSceneActor* ParentScene
-        , float& Temperature
-        , FDTLevelAsset& Level) const;
-
-	virtual FString GatherSetupProps(ADTSceneActor* ParentScene, TMap<FString, FString>& Attrs, TMap<FString, FString>& Props) override
-	{
-		Super::GatherSetupProps(ParentScene, Attrs, Props);
-        float Temperature;
-        FDTLevelAsset Level;
-        GetWorldSetupValues(ParentScene, Temperature, Level);
-        Props.Emplace(TEXT("temperature"), LexToString(Temperature));
-        Attrs.Emplace(TEXT("level"), LexToString(Level));
-		return TEXT("World");
-	}
-};
-
-UCLASS(BlueprintType)
 class DTHTTPCLIENT_API UDTGameActorObject : public UDTGameEntityObject
 {
 	GENERATED_BODY()
@@ -740,17 +634,123 @@ public:
 	}
 };
 
+UCLASS(BlueprintType)
+class DTHTTPCLIENT_API UDTGameWorldObject : public UDTGameBaseObject
+{
+	GENERATED_BODY()
+public:
+
+    FDTGenericTimeline<float> TemperatureProperty = "";
+    UFUNCTION(BlueprintPure, Category = "DTHttp")
+        void GetTemperature(const FDateTime& Timestamp, float& Previous, float& Value, float& Alpha) const
+        {
+            const FDTGenericKeyframe<float>& keyframe = TemperatureProperty.Peek(Timestamp);
+            Alpha = LerpTimestamp(Timestamp, keyframe.Timestamp, keyframe.Duration);
+            Previous = keyframe.Previous;
+            Value = keyframe.Value;
+        }
+
+    
+    FDTGenericPropertyValue<FDTLevelAsset> LevelProperty = "";
+    UFUNCTION(BlueprintPure, Category = "DTHttp")
+        const FDTLevelAsset& GetLevel() const
+        {
+            return LevelProperty.Value;
+        }
+
+	virtual bool PushChange(const FDTPropertyChange& Change) override
+	{
+		if (Change.PropReg.Equals(TEXT("temperature"))) { TemperatureProperty.Push(Change); return true; }
+		return Super::PushChange(Change);
+	}
+	virtual bool PushAttributes(const FDTAttributeData& data) override
+	{
+		if (data.PropReg.Equals(TEXT("level"))) { LexFromString(LevelProperty.Value, *data.PropVal); return true; }
+		return Super::PushAttributes(data);
+	}
+	virtual EDTType GetType() const override
+    {
+        return EDTType::World;
+    }
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnGameWorldTick, UDTGameWorldObject*, GameObject, const FDateTime&, Timestamp);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnGameWorldUpdate, UDTGameWorldObject*, GameObject);
+
+UCLASS(ClassGroup = (GameObjects), Blueprintable, meta = (BlueprintSpawnableComponent))
+class DTHTTPCLIENT_API UDTGameWorldComponent : public UDTGameBaseComponent
+{
+	GENERATED_BODY()
+public:
+
+	UPROPERTY(BlueprintReadOnly, Category = "DTHttp")
+		TWeakObjectPtr<UDTGameWorldObject> GameObject;
+        
+	UPROPERTY(BlueprintAssignable)
+        FOnGameWorldTick OnGameTick;
+        
+	UPROPERTY(BlueprintAssignable)
+        FOnGameWorldUpdate OnGameUpdate;
+    
+	virtual bool TryAssignObject(UDTGameBaseObject* InGameObject) override
+	{
+		GameObject = Cast<UDTGameWorldObject>(InGameObject);
+		return GameObject.IsValid();
+	}
+
+	virtual void GameTick(const FDateTime& Timestamp) override
+	{
+        Super::GameTick(Timestamp);
+        if (GameObject.IsValid())
+        {
+            OnGameTick.Broadcast(GameObject.Get(), Timestamp);
+        }
+	}
+
+	virtual void GameUpdate() override
+	{
+        Super::GameUpdate();
+        if (GameObject.IsValid())
+        {
+            OnGameUpdate.Broadcast(GameObject.Get());
+        }
+	}
+};
+
+UCLASS(ClassGroup = (GameObjects), Blueprintable, meta = (BlueprintSpawnableComponent))
+class DTHTTPCLIENT_API ADTSetupWorldActor : public ADTSetupBaseActor
+{
+	GENERATED_BODY()
+public:
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "DTHttp")
+    void GetWorldSetupValues(ADTSceneActor* ParentScene
+        , float& Temperature
+        , FDTLevelAsset& Level) const;
+
+	virtual FString GatherSetupProps(ADTSceneActor* ParentScene, TMap<FString, FString>& Attrs, TMap<FString, FString>& Props) override
+	{
+		Super::GatherSetupProps(ParentScene, Attrs, Props);
+        float Temperature;
+        FDTLevelAsset Level;
+        GetWorldSetupValues(ParentScene, Temperature, Level);
+        Props.Emplace(TEXT("temperature"), LexToString(Temperature));
+        Attrs.Emplace(TEXT("level"), LexToString(Level));
+		return TEXT("World");
+	}
+};
+
 FORCEINLINE TSubclassOf<UDTGameBaseObject> GetTypeObjectClass(EDTType Type)
 {
     switch(Type)
     {
         case EDTType::Entity: return UDTGameEntityObject::StaticClass();
-        case EDTType::World: return UDTGameWorldObject::StaticClass();
         case EDTType::Actor: return UDTGameActorObject::StaticClass();
         case EDTType::Character: return UDTGameCharacterObject::StaticClass();
         case EDTType::Yoyo: return UDTGameYoyoObject::StaticClass();
         case EDTType::Spawner: return UDTGameSpawnerObject::StaticClass();
         case EDTType::Item: return UDTGameItemObject::StaticClass();
+        case EDTType::World: return UDTGameWorldObject::StaticClass();
         default: return nullptr;
     }
 }

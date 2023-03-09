@@ -116,11 +116,15 @@ public:
 
 	/////////////////////////////////////////////////////////////////////////////
 
+	using FSSEStopEvent = TMulticastDelegate<void()>;
+
 	struct FSSEContext {
 
 		FSSEContext(FRequestPtr InRequest);
-		FResponseString Consume();
+		FString Consume();
 		void Stop();
+
+		FSSEStopEvent OnStop;
 
 	private:
 		FRequestPtr Request;
@@ -128,11 +132,13 @@ public:
 	};
 
 	using FSSEContextPtr = TSharedPtr<FSSEContext>;
-	using FSSEResponseCallback = TDelegate<void(const FResponseString&)>;
+	using FSSEResponseCallback = TDelegate<void(const FString&)>;
 
 	static FSSEContextPtr StartSSESession(
 		const FDTHttpContext& Context,
 		const FString& Path,
+		int32 MaxBytes,
+		float Timeout,
 		FSSEResponseCallback Callback);
 
 	template<typename ResultType>
@@ -141,22 +147,17 @@ public:
 	template<typename ResultType>
 	static FSSEContextPtr StartSSESession(
 		const FDTHttpContext& Context, 
-		const FString& Path, 
+		const FString& Path,
+		int32 MaxBytes,
+		float Timeout,
 		FSSEResultCallback<ResultType> Callback)
 	{
-		return StartSSESession(Context, Path,
-			TDelegate<void(const FResponseString&)>::CreateLambda([Callback](const FResponseString& Result)
+		return StartSSESession(Context, Path, MaxBytes, Timeout,
+			FSSEResponseCallback::CreateLambda([Callback](const FString& Result)
 			{
 				ResultType Response;
-				if (EHttpResponseCodes::IsOk(static_cast<EHttpResponseCodes::Type>(Result.Code)))
-				{
-					LexFromString(Response, *Result.Body);
-					Callback.ExecuteIfBound(Response);
-				}
-				else
-				{
-					UE_LOG(DTHttpClient, Error, TEXT("Failed to translate server-side event result: %s"), *Result.Body);
-				}
+				LexFromString(Response, *Result);
+				Callback.ExecuteIfBound(Response);
 			}));
 	}
 };

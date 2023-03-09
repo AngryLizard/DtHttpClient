@@ -87,6 +87,7 @@ TWebPromisePtr<FTypeSetup> UDTTypeSubsystem::FetchTypes()
 			FTypePropInfo PropInfo;
 			PropInfo.Description = Prop.Desc;
 			PropInfo.Type = Prop.Type;
+			PropInfo.Initial = Prop.Initial;
 			TypeInfo.Props.Emplace(Prop.PropReg, PropInfo);
 		}
 		for (const FDTTypePropData& Attr : Type.Attrs)
@@ -94,6 +95,7 @@ TWebPromisePtr<FTypeSetup> UDTTypeSubsystem::FetchTypes()
 			FTypePropInfo AttrInfo;
 			AttrInfo.Description = Attr.Desc;
 			AttrInfo.Type = Attr.Type;
+			AttrInfo.Initial = Attr.Initial;
 			TypeInfo.Attrs.Emplace(Attr.PropReg, AttrInfo);
 		}
 		Setup.Infos.Emplace(Type.TypeReg, TypeInfo);

@@ -280,19 +280,44 @@ e.g. if they're running the game multiple times in different windows. */
             Context, "POST", FString::Format(TEXT("/session/start"), Args), RequestBody);
     }
 
-    /** Get updates from an active session. Also refresh the heartbeat timer so
-that the session keeps on living. */
-    static TWebPromisePtr<FResponseData<FDTSessionUpdate>> PostSessionUpdateWith(
-        const FDTHttpContext& Context, const FString& SessionRef, const FDateTime& Date, const EDTPropertyQuery& Query, 
+    /** Subscribe to timeline changes (SSE). Setup can take a while so this will also perform a diff on the database.
+Usually a client will first do an update with refresh and then subscribe to further changes. */
+    static TWebPromisePtr<FResponseData<FEmptyResult>> GetSessionEventsWith(
+        const FDTHttpContext& Context, 
         const FEmptyBody& RequestBody)
     {
         TMap<FString, FStringFormatArg> Args;
-        Args.Add(TEXT("sessionRef"), SanitizeArg(LexToString(SessionRef)));
+
+        return UDTHttpRequester::SendHttpRequest<FEmptyBody, FEmptyResult>(
+            Context, "GET", FString::Format(TEXT("/session/events/{sessionReg}"), Args), RequestBody);
+    }
+
+    /** Get pending updates from an active session. Also refresh the heartbeat timer so
+that the session keeps on living. */
+    static TWebPromisePtr<FResponseData<TArray<FDTPropertyChange>>> PostSessionUpdateWith(
+        const FDTHttpContext& Context, const FString& SessionReg, 
+        const FEmptyBody& RequestBody)
+    {
+        TMap<FString, FStringFormatArg> Args;
+        Args.Add(TEXT("sessionReg"), SanitizeArg(LexToString(SessionReg)));
+
+        return UDTHttpRequester::SendHttpRequest<FEmptyBody, TArray<FDTPropertyChange>>(
+            Context, "POST", FString::Format(TEXT("/session/update/{sessionReg}"), Args), RequestBody);
+    }
+
+    /** Get state from an active session and resets session queue.
+This directly queries the database and discards current session state. */
+    static TWebPromisePtr<FResponseData<FDTSessionUpdate>> PostSessionResetWith(
+        const FDTHttpContext& Context, const FString& SessionReg, const FDateTime& Date, const EDTPropertyQuery& Query, 
+        const FEmptyBody& RequestBody)
+    {
+        TMap<FString, FStringFormatArg> Args;
+        Args.Add(TEXT("sessionReg"), SanitizeArg(LexToString(SessionReg)));
         Args.Add(TEXT("date"), SanitizeArg(LexToString(Date)));
         Args.Add(TEXT("query"), SanitizeArg(LexToString(Query)));
 
         return UDTHttpRequester::SendHttpRequest<FEmptyBody, FDTSessionUpdate>(
-            Context, "POST", FString::Format(TEXT("/session/update/{sessionRef}/from/{date}/{query}"), Args), RequestBody);
+            Context, "POST", FString::Format(TEXT("/session/reset/{sessionReg}/from/{date}/{query}"), Args), RequestBody);
     }
 
     /** This endpoint lets non-registered players observe a session if enabled on this server and on entities that allow it.
@@ -312,13 +337,13 @@ It is restricted to only one entity and we always assume a full refresh to allow
 
     /** Stop a session. This should be called once player disconnects. */
     static TWebPromisePtr<FResponseData<FEmptyResult>> DeleteSessionStopWith(
-        const FDTHttpContext& Context, const FString& SessionRef, 
+        const FDTHttpContext& Context, const FString& SessionReg, 
         const FEmptyBody& RequestBody)
     {
         TMap<FString, FStringFormatArg> Args;
-        Args.Add(TEXT("sessionRef"), SanitizeArg(LexToString(SessionRef)));
+        Args.Add(TEXT("sessionReg"), SanitizeArg(LexToString(SessionReg)));
 
         return UDTHttpRequester::SendHttpRequest<FEmptyBody, FEmptyResult>(
-            Context, "DELETE", FString::Format(TEXT("/session/stop/{sessionRef}"), Args), RequestBody);
+            Context, "DELETE", FString::Format(TEXT("/session/stop/{sessionReg}"), Args), RequestBody);
     }
 };

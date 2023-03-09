@@ -70,6 +70,7 @@ TWebPromisePtr<FActionSetup> UDTActionSubsystem::FetchActions()
 			ParamInfo.Input = Param.Input;
 			ParamInfo.Description = Param.Desc;
 			ParamInfo.Type = Param.Type;
+			ParamInfo.Initial = Param.Initial;
 			ActionInfo.Params.Emplace(Param.ParamReg, ParamInfo);
 		}
 		Setup.Infos.Emplace(Action.ActionReg, ActionInfo);
@@ -122,7 +123,8 @@ TWebPromisePtr<void> UDTActionSubsystem::RunAction(const FDTEntityRef& CallerRef
 	}
 
 	const UDTHttpClientSettings* Settings = GetDefault<UDTHttpClientSettings>();
-	const FString Path = FString::Printf(TEXT("/action/%s/%s?Delay=%.3f"), *LexToString(CallerRef), *Name, (Settings->UpdateFrequency + Settings->MaxDelay));
+	const float Delay = Settings->bSSEEnabled ? 0.f : Settings->UpdatePollFrequency;
+	const FString Path = FString::Printf(TEXT("/action/%s/%s?delay=%.3f"), *LexToString(CallerRef), *Name, (Delay + Settings->MaxDelay));
 
 	return UDTHttpRequester::SendHttpRequest<FEmptyResult>(ClientSubsystem->GetContext(), TEXT("POST"), Path, ActionParams)
 		->WeakThen(this, [](const FResponseData<FEmptyResult>& Response)

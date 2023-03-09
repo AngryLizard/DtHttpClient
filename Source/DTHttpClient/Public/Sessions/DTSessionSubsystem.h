@@ -62,7 +62,7 @@ public:
 private:
 	TOptional<FString> ActiveSession;
 	TArray<FDTEntityRef> ObservedEntities;
-	TOptional<UDTHttpRequester::FSSEContextPtr> ActiveSSEContext;
+	UDTHttpRequester::FSSEContextPtr ActiveSSEContext;
 
 	FDateTime LastUpdateTime;
 	FTimerHandle UpdateTimerHandle;
@@ -72,7 +72,15 @@ private:
 
 	void RestartUpdateTimer();
 	void StopUpdateTimer();
-	void OnTimerUpdate(bool Refresh);
+
+	UFUNCTION()
+		void OnTimerUpdate(bool Refresh);
+
+	UFUNCTION()
+		void OnSSEUpdate(const FDTSessionUpdate& Result);
+
+	UFUNCTION()
+		void OnSSEStop();
 
 	// Get timeline changes since last update
 	TWebPromisePtr<FDateTime> UpdateSession(const FDateTime& Time, bool Refresh);
