@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+
 
 using System.Diagnostics;
 using System.IO;
