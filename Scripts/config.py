@@ -15,7 +15,7 @@ typeAssignments = {
     "Transform":            ["FDTTransform",            "FDTTransform",             False],
     "BooleanArray":         ["TArray<bool>",            "TArray<bool>",             False],
     "NumberArray":          ["TArray<float>",           "TArray<float>",            False],
-    "StringArray":          ["TArray<FString>",         "FString",                  False],
+    "StringArray":          ["TArray<FString>",         "TArray<FString>",          False],
     "Type":                 ["EDTType",                 "EDTType",                  True],
 }
 
